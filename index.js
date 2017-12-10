@@ -10,7 +10,7 @@ const writeFile = promisify(fs.writeFile)
 const appendFile = promisify(fs.appendFile)
 
 client.on('messageCreate', async message => {
-  if (message.content.startsWith('!verify') && message.member && message.member.roles.filter(role => role === verifiedRoleId).length > 0)
+  if (message.content.startsWith('!verify') && message.member && message.member.roles.filter(role => role === '352785124540153868').length > 0)
     return
   if (message.content.startsWith('!verify')) {
     const { author: user, channel } = message
@@ -24,7 +24,7 @@ client.on('messageCreate', async message => {
         return logger.error(`User ${user.username} with id ${user.id} used acronym ${acronym} but it does not exist in our list`)
       } else if (~(await readFile(path.resolve(__dirname, 'registrerade.txt'), 'utf8')).indexOf(acronym)) {
         client.createMessage(channel.id, 'Någon har redan registrerat det acronymet')
-        return logger.error(`User ${user.username} with id ${user.id} tried to use already registered acronym ${acronym}`)
+        return logger.error(`User ${user.username} with id ${user.id} tried to use a already registered acronym ${acronym}`)
       }
       guild.addMemberRole(user.id, '352785124540153868', `${user.username} (${user.id}) verifierades med ${acronym}`)
       appendFile(path.resolve(__dirname, 'registrerade.txt'), acronym + '\n', 'utf8')
