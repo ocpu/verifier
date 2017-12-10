@@ -1,62 +1,39 @@
-const Eris = require('eris')
-const fs = require('fs')
+const { promisify } = require('util')
 const path = require('path')
+const fs = require('fs')
 
-const bot = new Eris(process.env.verifier_bot)
+const client = require('eris')(process.env.VERIFIER_TOKEN)
+const logger = require('./logger').from("main")
 
-const verifiedRoleId = "352785124540153868"
-// const timeoutRoleId = "355002513537237021"
-                    // 234676929263828993
-// const timeoutLimit = 4
+const readFile = promisify(fs.readFile)
+const writeFile = promisify(fs.writeFile)
+const appendFile = promisify(fs.appendFile)
 
-// const users = {
-//     // [id]: (times executed)
-// }
+client.on('messageCreate', async message => {
+  if (message.content.startsWith('!verify') && message.member && message.member.roles.filter(role => role === verifiedRoleId).length > 0)
+    return
+  if (message.content.startsWith('!verify')) {
+    const { author: user, channel } = message
+    const guild = channel.guild
+    try {
+      const [, acronym] = /(\w{4}\d{2})/i.exec(message.content.substring(7))
+      const acronymes = await readFile(path.resolve(__dirname, 'acronyms.txt'), 'utf8')
 
-bot.on('messageCreate', message => {
-    // if (message.content.startsWith('!verify')) {
-    //     if (!(message.author.id in users)) {
-    //         setTimeout(() => {
-    //             const guild = bot.getChannel(message.channel.id).guild
-    //             const members = guild.members
-    //             const member = members.find(member => member.id === message.author.id)
-    //             if (users[member.id] > timeoutLimit) {
-    //                 const roles = member.roles
-    //                 roles.forEach(role => {
-    //                     member.removeRole(role, 'Timeout set')
-    //                 })
-    //                 member.addRole(timeoutRoleId, 'Timeout set')
-    //                 setTimeout(() => {
-    //                     roles.forEach(role => {
-    //                         member.addRole(member.id, role, 'Timeout expired')
-    //                     });
-    //                     member.removeRole(timeoutRoleId, 'Timeout expired')
-    //                 }, 8000)
-    //             } else users[member.id] = void 0
-    //         }, 5000)
-    //         users[message.author.id] = 1
-    //     } else users[message.author.id]++
-    // }
-    if (message.content.startsWith('!verify') && message.member && message.member.roles.filter(role => role === verifiedRoleId).length > 0)
-        return bot.createMessage(message.channel.id, 'Du är redan verifierad.')
-    if (message.content.startsWith('!verify')) {
-        try {
-            const [, acronym] = /(\w{4}\d{2})/i.exec(message.content.substring(7))
-            const c = fs.readFileSync(path.resolve(__dirname, 'acronyms.txt'), 'utf8')
-            const i = c.indexOf(acronym)
-            if (!~i) {
-                if (!!~fs.readFileSync(path.resolve(__dirname, 'registrerade.txt'), 'utf8').indexOf(acronym))
-                    return bot.createMessage(message.channel.id, 'Någon har redan blivit registrerat sig med det acronymet. Kontakta <@112287082717745152> eller <@234676929263828993> för mer info.')
-                return bot.createMessage(message.channel.id, 'Du är inte en student i webbprogrammering på bth från 2017')
-            }
-            console.log(`Student med acronym ${acronym} är nu registrerad!`)
-            fs.writeFileSync(path.resolve(__dirname, 'acronyms.txt'), c.substring(0, i) + c.substring(i + 6), 'utf8')
-            message.channel.guild.addMemberRole(message.author.id, verifiedRoleId, `${message.author.username} (${message.author.id}) verifierades med ${acronym}`)
-            bot.createMessage(message.channel.id, 'Du har blivit verifierad.')
-        } catch (e) {
-            bot.createMessage(message.channel.id, 'Va? Nej? Varför skulle du testa det...')
-        }
+      const index = acronymes.indexOf(acronym)
+      if (!~index) {
+        return logger.error(`User ${user.username} with id ${user.id} used acronym ${acronym} but it does not exist in our list`)
+      } else if (~(await readFile(path.resolve(__dirname, 'registrerade.txt'), 'utf8')).indexOf(acronym)) {
+        client.createMessage(channel.id, 'Någon har redan registrerat det acronymet')
+        return logger.error(`User ${user.username} with id ${user.id} tried to use already registered acronym ${acronym}`)
+      }
+      guild.addMemberRole(user.id, '352785124540153868', `${user.username} (${user.id}) verifierades med ${acronym}`)
+      appendFile(path.resolve(__dirname, 'registrerade.txt'), acronym + '\n', 'utf8')
+      client.createMessage(channel.id, user.mention + ' har blivit verifierad.')
+      logger.info(`User ${user.username} with id ${user.id} got verified with acronym ${acronym}`)
+    } catch (e) {
+      logger.error(`User ${user.username} with id ${user.id} used a invalid acronym`)
     }
+  }
 })
 
-bot.connect()
+client.connect()
